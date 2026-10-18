@@ -33,6 +33,8 @@ jobs:
       MOLECULE_DISTRO: ${{ matrix.distro }}
       PY_COLORS: "1"
       ANSIBLE_FORCE_COLOR: "1"
+      # Ansible writes every task result here, whatever Molecule shows on screen.
+      ANSIBLE_LOG_PATH: ${{ github.workspace }}/ansible-${{ matrix.distro }}.log
     steps:
       - uses: actions/checkout@v4
 
@@ -48,3 +50,22 @@ jobs:
       - name: Molecule test
         working-directory: roles/${{ inputs.role }}
         run: molecule test
+
+      - name: Show Ansible log on failure
+        if: failure()
+        run: |
+          if [ -f "$ANSIBLE_LOG_PATH" ]; then
+            grep -nE "fatal:|FAILED|failed=[1-9]|ERROR" "$ANSIBLE_LOG_PATH" | tail -40 || true
+            echo "----- last 150 lines -----"
+            tail -n 150 "$ANSIBLE_LOG_PATH"
+          else
+            echo "No Ansible log was written."
+          fi
+
+      - name: Upload Ansible log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-log-${{ inputs.role }}-${{ matrix.distro }}
+          path: ${{ github.workspace }}/ansible-${{ matrix.distro }}.log
+          if-no-files-found: ignore
