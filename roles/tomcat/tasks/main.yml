@@ -1,4 +1,15 @@
 ---
+# Minimal images (containers, some cloud images) strip /usr/share/man, which makes the
+# OpenJDK post-install script fail on its update-alternatives man-page link.
+- name: Ensure man page directory exists for Java alternatives
+  ansible.builtin.file:
+    path: /usr/share/man/man1
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: ansible_facts['os_family'] == 'Debian'
+
 - name: Install Java runtime
   ansible.builtin.package:
     name: "{{ tomcat_java_package[ansible_facts['os_family']] }}"

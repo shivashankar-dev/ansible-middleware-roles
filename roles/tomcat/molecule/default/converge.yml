@@ -1,7 +1,6 @@
 ---
 - name: Converge
   hosts: all
-  become: true
   pre_tasks:
     - name: Refresh apt cache on Debian family
       ansible.builtin.apt:
