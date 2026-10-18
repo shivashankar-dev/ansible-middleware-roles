@@ -22,9 +22,10 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
           cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install tooling
-        run: pip install ansible-core ansible-lint
+        run: pip install -r requirements-dev.txt
 
       - name: Install collections
         run: ansible-galaxy collection install -r requirements.yml

@@ -29,9 +29,6 @@ jobs:
       fail-fast: false
       matrix:
         distro: ${{ fromJSON(inputs.distros) }}
-    defaults:
-      run:
-        working-directory: roles/${{ inputs.role }}
     env:
       MOLECULE_DISTRO: ${{ matrix.distro }}
       PY_COLORS: "1"
@@ -43,9 +40,11 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
           cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install tooling
-        run: pip install ansible-core "molecule>=24" "molecule-plugins[docker]" docker
+        run: pip install -r requirements-dev.txt
 
       - name: Molecule test
+        working-directory: roles/${{ inputs.role }}
         run: molecule test

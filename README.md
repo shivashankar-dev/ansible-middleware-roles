@@ -57,7 +57,7 @@ iis_sites:
 ## Testing
 
 ```bash
-pip install ansible-core molecule "molecule-plugins[docker]"
+pip install -r requirements-dev.txt
 cd roles/tomcat
 MOLECULE_DISTRO=rockylinux9 molecule test
 ```
