@@ -1,0 +1,108 @@
+---
+- name: "Create content folder | {{ site.name }}"
+  ansible.windows.win_file:
+    path: "{{ site.physical_path }}"
+    state: directory
+
+- name: "Deploy health page | {{ site.name }}"
+  ansible.windows.win_copy:
+    content: "OK"
+    dest: '{{ site.physical_path }}\health.html'
+  when: site.health_page | default(true)
+
+- name: "Create or update app pool | {{ site.name }}"
+  ansible.windows.win_powershell:
+    parameters:
+      Name: "{{ site.name }}"
+      Clr: "{{ site.dotnet_clr_version | default('v4.0') }}"
+      Pipeline: "{{ site.pipeline_mode | default('Integrated') }}"
+    script: |
+      param($Name, $Clr, $Pipeline)
+      Import-Module WebAdministration
+      $Ansible.Changed = $false
+      $path = "IIS:\AppPools\$Name"
+      if (-not (Test-Path $path)) {
+          New-WebAppPool -Name $Name | Out-Null
+          $Ansible.Changed = $true
+      }
+      $pool = Get-Item $path
+      if ($pool.managedRuntimeVersion -ne $Clr) {
+          Set-ItemProperty $path -Name managedRuntimeVersion -Value $Clr
+          $Ansible.Changed = $true
+      }
+      if ($pool.managedPipelineMode -ne $Pipeline) {
+          Set-ItemProperty $path -Name managedPipelineMode -Value $Pipeline
+          $Ansible.Changed = $true
+      }
+      if ($pool.processModel.identityType -ne 'ApplicationPoolIdentity') {
+          Set-ItemProperty $path -Name processModel.identityType -Value 'ApplicationPoolIdentity'
+          $Ansible.Changed = $true
+      }
+
+- name: "Grant app pool identity read access to content | {{ site.name }}"
+  ansible.windows.win_acl:
+    path: "{{ site.physical_path }}"
+    user: 'IIS AppPool\{{ site.name }}'
+    rights: ReadAndExecute
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+    propagation: 'None'
+
+- name: "Create or update site | {{ site.name }}"
+  ansible.windows.win_powershell:
+    parameters:
+      Name: "{{ site.name }}"
+      Port: "{{ site.port }}"
+      HostHeader: "{{ site.host_header | default('') }}"
+      PhysicalPath: "{{ site.physical_path }}"
+    script: |
+      param($Name, [int]$Port, $HostHeader, $PhysicalPath)
+      Import-Module WebAdministration
+      $Ansible.Changed = $false
+      $binding = "*:${Port}:${HostHeader}"
+      $site = Get-Website -Name $Name -ErrorAction SilentlyContinue
+      if (-not $site) {
+          New-Website -Name $Name -Port $Port -HostHeader $HostHeader `
+            -PhysicalPath $PhysicalPath -ApplicationPool $Name | Out-Null
+          $Ansible.Changed = $true
+      } else {
+          if ($site.physicalPath -ne $PhysicalPath) {
+              Set-ItemProperty "IIS:\Sites\$Name" -Name physicalPath -Value $PhysicalPath
+              $Ansible.Changed = $true
+          }
+          if ($site.applicationPool -ne $Name) {
+              Set-ItemProperty "IIS:\Sites\$Name" -Name applicationPool -Value $Name
+              $Ansible.Changed = $true
+          }
+          $current = (Get-WebBinding -Name $Name -Protocol http).bindingInformation
+          if ($current -notcontains $binding) {
+              Get-WebBinding -Name $Name -Protocol http | Remove-WebBinding
+              New-WebBinding -Name $Name -Protocol http -Port $Port -HostHeader $HostHeader
+              $Ansible.Changed = $true
+          }
+      }
+      if ((Get-Website -Name $Name).State -ne 'Started') {
+          Start-Website -Name $Name
+          $Ansible.Changed = $true
+      }
+
+- name: "Open firewall port | {{ site.name ~ ':' ~ site.port }}"
+  community.windows.win_firewall_rule:
+    name: "IIS {{ site.name }} ({{ site.port }})"
+    localport: "{{ site.port }}"
+    action: allow
+    direction: in
+    protocol: tcp
+    state: present
+    enabled: true
+
+- name: "Check site answers | {{ site.name ~ ':' ~ site.port }}"
+  ansible.windows.win_uri:
+    url: "http://localhost:{{ site.port }}/health.html"
+    status_code: 200
+  register: iis_site_health
+  retries: 6
+  delay: 5
+  until: iis_site_health.status_code == 200
+  when: site.health_page | default(true)

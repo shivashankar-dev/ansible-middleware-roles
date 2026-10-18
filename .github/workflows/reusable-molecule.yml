@@ -1,0 +1,51 @@
+name: reusable-molecule
+
+# Reusable workflow: run a role's Molecule scenario (converge, idempotence, verify)
+# in systemd-enabled containers, once per distribution.
+
+on:
+  workflow_call:
+    inputs:
+      role:
+        description: Role directory name under roles/
+        type: string
+        required: true
+      distros:
+        description: JSON list of geerlingguy docker image distros, e.g. ["ubuntu2204","rockylinux9"]
+        type: string
+        default: '["ubuntu2204"]'
+      python-version:
+        type: string
+        default: "3.12"
+
+permissions:
+  contents: read
+
+jobs:
+  molecule:
+    name: ${{ inputs.role }} on ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ${{ fromJSON(inputs.distros) }}
+    defaults:
+      run:
+        working-directory: roles/${{ inputs.role }}
+    env:
+      MOLECULE_DISTRO: ${{ matrix.distro }}
+      PY_COLORS: "1"
+      ANSIBLE_FORCE_COLOR: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install tooling
+        run: pip install ansible-core "molecule>=24" "molecule-plugins[docker]" docker
+
+      - name: Molecule test
+        run: molecule test

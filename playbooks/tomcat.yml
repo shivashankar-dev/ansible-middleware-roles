@@ -1,0 +1,6 @@
+---
+- name: Install Tomcat on Linux application servers
+  hosts: tomcat_servers
+  become: true
+  roles:
+    - role: tomcat

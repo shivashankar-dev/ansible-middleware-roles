@@ -1,0 +1,39 @@
+name: reusable-ansible-lint
+
+# Reusable workflow: ansible-lint (production profile) and playbook syntax checks.
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: "3.12"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install tooling
+        run: pip install ansible-core ansible-lint
+
+      - name: Install collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: ansible-lint
+        run: ansible-lint
+
+      - name: Syntax check playbooks
+        run: |
+          for pb in playbooks/*.yml; do
+            ansible-playbook --syntax-check "$pb"
+          done

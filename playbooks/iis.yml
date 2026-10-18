@@ -1,0 +1,5 @@
+---
+- name: Install IIS on Windows web servers
+  hosts: iis_servers
+  roles:
+    - role: iis

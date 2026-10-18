@@ -1,0 +1,25 @@
+---
+# Windows features installed with IIS.
+iis_features:
+  - Web-Server
+  - Web-Mgmt-Console
+  - Web-Asp-Net45
+  - Web-Http-Redirect
+  - Web-Http-Logging
+  - Web-Request-Monitor
+
+# Stop and disable the "Default Web Site" (hardening; frees port 80).
+iis_disable_default_site: true
+
+# Sites to create. Each site gets its own app pool with the same name.
+iis_sites:
+  - name: demo-app
+    port: 8081
+    host_header: ""
+    physical_path: 'C:\inetpub\demo-app'
+    dotnet_clr_version: v4.0 # use "" for "No Managed Code"
+    pipeline_mode: Integrated
+    health_page: true
+
+# Remove the "X-Powered-By: ASP.NET" header server-wide.
+iis_remove_powered_by_header: true

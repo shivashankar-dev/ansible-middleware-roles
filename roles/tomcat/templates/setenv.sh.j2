@@ -1,0 +1,5 @@
+#!/bin/sh
+# {{ ansible_managed }}
+CATALINA_PID="{{ tomcat_home }}/temp/tomcat.pid"
+CATALINA_OPTS="-Xms{{ tomcat_jvm_heap_min }} -Xmx{{ tomcat_jvm_heap_max }} -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom {{ tomcat_extra_java_opts }}"
+export CATALINA_PID CATALINA_OPTS

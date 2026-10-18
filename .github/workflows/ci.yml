@@ -1,0 +1,24 @@
+name: ci
+
+# Caller workflow: lint everything, then run Molecule for each Linux role.
+# The IIS role is lint- and syntax-checked here; it targets Windows Server over WinRM.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: ./.github/workflows/reusable-ansible-lint.yml
+
+  tomcat:
+    needs: lint
+    uses: ./.github/workflows/reusable-molecule.yml
+    with:
+      role: tomcat
+      distros: '["ubuntu2204", "ubuntu2404", "rockylinux9"]'

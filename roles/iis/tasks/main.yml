@@ -1,0 +1,47 @@
+---
+- name: Install IIS features
+  ansible.windows.win_feature:
+    name: "{{ iis_features }}"
+    state: present
+    include_management_tools: true
+  register: iis_feature_install
+
+- name: Reboot if the feature install requires it
+  ansible.windows.win_reboot:
+  when: iis_feature_install.reboot_required
+
+- name: Stop and disable the Default Web Site
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module WebAdministration
+      $site = Get-Website -Name 'Default Web Site' -ErrorAction SilentlyContinue
+      $Ansible.Changed = $false
+      if ($site -and $site.State -ne 'Stopped') {
+          Stop-Website -Name 'Default Web Site'
+          $Ansible.Changed = $true
+      }
+      if ($site -and (Get-ItemProperty 'IIS:\Sites\Default Web Site' -Name serverAutoStart).Value) {
+          Set-ItemProperty 'IIS:\Sites\Default Web Site' -Name serverAutoStart -Value $false
+          $Ansible.Changed = $true
+      }
+  when: iis_disable_default_site
+
+- name: Remove X-Powered-By header
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module WebAdministration
+      $filter = 'system.webServer/httpProtocol/customHeaders/add[@name="X-Powered-By"]'
+      $Ansible.Changed = $false
+      if (Get-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter $filter -Name name -ErrorAction SilentlyContinue) {
+          Remove-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' `
+            -Filter 'system.webServer/httpProtocol/customHeaders' -Name '.' -AtElement @{ name = 'X-Powered-By' }
+          $Ansible.Changed = $true
+      }
+  when: iis_remove_powered_by_header
+
+- name: Configure sites
+  ansible.builtin.include_tasks: site.yml
+  loop: "{{ iis_sites }}"
+  loop_control:
+    loop_var: site
+    label: "{{ site.name }}"

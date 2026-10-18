@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  role_name: tomcat
+  namespace: shivashankar_dev
+  author: Shiva Shankar K
+  description: Install and harden Apache Tomcat 10.1 on Debian/Ubuntu and RHEL/Rocky with systemd
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: EL
+      versions: ["9"]
+  galaxy_tags: [tomcat, java, middleware, systemd]
+dependencies: []

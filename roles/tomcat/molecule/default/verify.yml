@@ -1,0 +1,44 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    tomcat_http_port: 8080
+  tasks:
+    - name: Collect service state
+      ansible.builtin.service_facts:
+
+    - name: Tomcat service is running
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['tomcat.service'].state == 'running'
+        fail_msg: tomcat.service is not running
+
+    - name: Health page answers 200 OK
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ tomcat_http_port }}/health/"
+        return_content: true
+      register: tomcat_verify_health
+
+    - name: Health page body is OK
+      ansible.builtin.assert:
+        that: "'OK' in tomcat_verify_health.content"
+
+    - name: Default example apps are removed
+      ansible.builtin.stat:
+        path: /opt/tomcat/current/webapps/examples
+      register: tomcat_verify_examples
+
+    - name: Examples directory is absent
+      ansible.builtin.assert:
+        that: not tomcat_verify_examples.stat.exists
+
+    - name: Tomcat runs as the tomcat user, not root
+      ansible.builtin.command: ps -o user= -C java
+      register: tomcat_verify_java_user
+      changed_when: false
+
+    - name: Java process owner is tomcat
+      ansible.builtin.assert:
+        that: "'tomcat' in tomcat_verify_java_user.stdout and 'root' not in tomcat_verify_java_user.stdout"
